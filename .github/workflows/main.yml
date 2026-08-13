@@ -1,0 +1,121 @@
+name: CI
+on:
+  push:
+    branches:
+    - main
+    tags:
+    - 'v*.*.*'
+  workflow_dispatch:
+  schedule:
+  - cron: "0 6 * * *"
+jobs:
+  unit_tests:
+    name: Run unit tests
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        koha-version: [main, stable, oldstable]
+
+    steps:
+
+    - uses: actions/checkout@v4
+
+    - name: Get Koha Version Branch Name
+      id: koha-version
+      uses: "bywatersolutions/github-action-koha-get-version-by-label@master"
+      with:
+        version-label: "${{ matrix.koha-version }}"
+
+    - name: Check out Koha and koha-testing-docker
+      run: |
+        cd ..
+        git clone --branch ${{ steps.koha-version.outputs.current-branch-name }} --single-branch --depth 1 https://github.com/Koha-Community/Koha.git kohaclone
+        git clone --depth 1 https://gitlab.com/koha-community/koha-testing-docker.git
+
+    - name: Start koha-testing-docker
+      run: |
+        export KTD_HOME="$GITHUB_WORKSPACE/../koha-testing-docker"
+        export SYNC_REPO="$GITHUB_WORKSPACE/../kohaclone"
+        export LOCAL_USER_ID="$(id -u)" # Needed for koha-testing-docker
+        export KOHA_IMAGE="${{ matrix.koha-version == 'main' && 'main' || steps.koha-version.outputs.version-major-minor }}"
+        echo "Using koha/koha-testing:$KOHA_IMAGE"
+        cp "$KTD_HOME/env/defaults.env" "$KTD_HOME/.env"
+        sudo sysctl -w vm.max_map_count=262144
+        "$KTD_HOME/bin/ktd" up -d
+        "$KTD_HOME/bin/ktd" --wait-ready 900
+
+    - name: Run tests
+      run: |
+        docker cp . kohadev-koha-1:/var/lib/koha/kohadev/plugins
+        docker exec kohadev-koha-1 bash -c 'prove /var/lib/koha/kohadev/plugins/t'
+
+    - name: Show koha logs on failure
+      if: failure()
+      run: |
+        docker ps -a
+        docker logs kohadev-koha-1 2>&1 | tail -200
+
+  release:
+    name: Build & Release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: unit_tests
+    strategy:
+      fail-fast: false
+    steps:
+    - uses: actions/checkout@v1
+
+    - name: Parse out and store the GitHub repository name
+      id: myvars
+      run: |
+        IFS='/' read -r -a parts <<< "$GITHUB_REPOSITORY"
+        GITHUB_REPO="${parts[1]}"
+        echo ::set-output name=github_repo::$GITHUB_REPO
+        echo "GITHUB REPO: $GITHUB_REPO"
+
+        TAG_VERSION="${GITHUB_REF##*/}"
+        echo "TAG VERSION: $TAG_VERSION"
+        TAG_VERSION="${TAG_VERSION:1}"
+        echo "TAG VERSION 2: $TAG_VERSION"
+        echo ::set-output name=tag_version::$TAG_VERSION
+
+    - name: Get Koha Version Branch Name
+      id: koha-version-oldstable
+      uses: "bywatersolutions/github-action-koha-get-version-by-label@master"
+      with:
+        version-label: "oldstable"
+
+    - name: Print minimum version
+      run: |
+        echo "Current oldstable version: ${{ steps.koha-version-oldstable.outputs.version-major-minor }}"
+
+    - name: Dump myvars outputs
+      env:
+        GITHUB_CONTEXT: ${{ toJson(steps.myvars.outputs) }}
+      run: echo "$GITHUB_CONTEXT"
+
+    - name: Build Koha Plugin kpz artifact
+      id: kpz
+      uses: "bywatersolutions/github-action-koha-plugin-create-kpz@master"
+      with:
+        release-version: ${{ steps.myvars.outputs.tag_version }}
+        release-name: ${{ steps.myvars.outputs.github_repo }}
+        minimum-version: ${{ steps.koha-version-oldstable.outputs.version-major-minor }}
+        plugin-module: "Koha/Plugin/Com/ByWaterSolutions/KajeetToKoha.pm"
+
+    - name: See if kpz was created
+      run: |
+        echo "FILENAME: ${{ steps.kpz.outputs.filename }}"
+        ls -alh
+
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: |
+          ${{ steps.kpz.outputs.filename }}
+          CHANGELOG.md
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
