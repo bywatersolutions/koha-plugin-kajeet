@@ -61,6 +61,14 @@
                                 [% END %]
                             </select>
                         </li>
+                        <li>
+                            <label for="item_field_for_imei">Item field used for IMEI storage: </label>
+                            <select name="item_field_for_imei" id="item_field_for_imei">
+                                [% FOREACH f IN [ 'stocknumber', 'itemnotes_nonpublic' ] %]
+                                    <option value="[% f %]" [% IF item_field_for_imei == f %]selected="selected"[% END %]>[% f %]</option>
+                                [% END %]
+                            </select>
+                        </li>
                     </ol>
                 </fieldset>
 

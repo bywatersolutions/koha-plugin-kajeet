@@ -68,6 +68,7 @@ sub configure {
             api_key_is_set     => ( $self->retrieve_data('api_key') ? 1 : 0 ),
             selected_itemtypes => \%selected,
             itemtypes          => Koha::ItemTypes->search_with_localization,
+            item_field_for_imei => $self->retrieve_data('item_field_for_imei'),
         );
 
         return $self->output_html( $template->output() );
@@ -75,6 +76,7 @@ sub configure {
 
     my $data = {
         itemtypes => encode_json( [ $cgi->multi_param('itemtypes') ] ),
+        item_field_for_imei => scalar $cgi->param('item_field_for_imei'),
     };
 
     # Only replace the stored key when a new one is entered.
@@ -119,10 +121,14 @@ sub after_circ_action {
         my $due = dt_from_string( $checkout->date_due )->strftime('%m/%d/%Y'); 
 
         return unless $self->_itemtype_is_configured($itemtype);
+
+        my $item_field = $self->retrieve_data('item_field_for_imei');
+        return unless $item_field;
+
         try {
             $self->_kajeet_request({
                 actionType => 'checkout',
-                imei       => $checkout_item->stocknumber,
+                imei       => $checkout_item->$item_field,
                 borrowerId => $checkout->borrowernumber,
                 dueDate    => $due,
             });
@@ -138,10 +144,13 @@ sub after_circ_action {
         my $itemtype = $checkin_item->effective_itemtype;
 
         return unless $self->_itemtype_is_configured($itemtype);
+
+        my $item_field = $self->retrieve_data('item_field_for_imei');
+        return unless $item_field;
         try {
             $self->_kajeet_request({
                 actionType => 'checkin',
-                imei       => $checkin_item->stocknumber,
+                imei       => $checkin_item->$item_field,
             });
         }
         catch {
