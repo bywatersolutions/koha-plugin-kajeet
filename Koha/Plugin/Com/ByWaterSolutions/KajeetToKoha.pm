@@ -7,6 +7,7 @@ use Koha::Plugin::Com::ByWaterSolutions::KajeetToKoha::API;
 use base qw(Koha::Plugins::Base);
 
 use JSON qw( encode_json decode_json );
+use Koha::DateUtils qw( dt_from_string );
 use Try::Tiny;
 use Koha::Encryption;
 use Koha::ItemTypes;
@@ -111,18 +112,23 @@ sub after_circ_action {
     my ( $self, $params ) = @_;
 
     my $action = $params->{action};
-   
     if ( $action eq 'checkout' ) {
         my $checkout = $params->{payload}->{checkout};
         my $checkout_item = $checkout->item;
         my $itemtype = $checkout_item->effective_itemtype;
+        my $due = dt_from_string( $checkout->date_due )->strftime('%m/%d/%Y'); 
 
         return unless $self->_itemtype_is_configured($itemtype);
         try {
-            warn 'HERE WE TRY to activate the device';
+            $self->_kajeet_request({
+                actionType => 'checkout',
+                imei       => $checkout_item->stocknumber,
+                borrowerId => $checkout->borrowernumber,
+                dueDate    => $due,
+            });
         }
         catch {
-            warn 'Problem activating the Kajeet device';
+            warn "Problem activating the Kajeet device: $_";
         };
     }
 
@@ -133,13 +139,15 @@ sub after_circ_action {
 
         return unless $self->_itemtype_is_configured($itemtype);
         try {
-            warn 'HERE WE TRY to deactivate the device';
+            $self->_kajeet_request({
+                actionType => 'checkin',
+                imei       => $checkin_item->stocknumber,
+            });
         }
         catch {
-            warn 'Problem deactivating the Kajeet device';
+            warn "Problem deactivating the Kajeet device: $_";
         };
     }
-
     return;
 }
 
