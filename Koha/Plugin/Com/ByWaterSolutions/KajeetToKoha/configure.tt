@@ -39,9 +39,9 @@
                             <label for="api_key">API key: </label>
                             <input type="password" name="api_key" id="api_key"
                                    value="" size="60" autocomplete="new-password"
-                                   [% IF api_key_is_set %]placeholder="(unchanged - enter a new key to replace)"[% END %] />
+                                   [% IF api_key_is_set %]placeholder="A KEY IS CURRENTLY STORED"[% END %] />
                             [% IF api_key_is_set %]
-                                <div class="hint">A key is stored. Leave blank to keep it.</div>
+                                <div class="hint">An API key is currently stored</div>
                             [% END %]
                         </li>
                     </ol>
