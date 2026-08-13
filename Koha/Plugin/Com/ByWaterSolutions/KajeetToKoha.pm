@@ -15,12 +15,12 @@ our $VERSION = "0.0.1";
 
 our $metadata = {
     name             => 'Kajeet API plugin',
-    author           => 'Lucas Gass',
-    description      => 'A plugin to integrate Kajeet services with Koha  ',
+    author           => 'ByWater Solutions',
+    description      => 'A plugin to integrate Kajeet services with Koha',
     date_authored    => '2026-07-13',
     date_updated     => '2026-07-13',
     minimum_version  => '25.1100000',
-    maximum_version  => '26.1199000',
+    maximum_version  => '28.1199000',
     version          => $VERSION,
 };
 
@@ -64,52 +64,27 @@ sub configure {
             @{ $stored_itemtypes ? decode_json($stored_itemtypes) : [] };
 
         $template->param(
-            api_base_url       => $self->retrieve_data('api_base_url'),
-            username           => $self->retrieve_data('username'),
-            password_is_set    => ( $self->retrieve_data('password') ? 1 : 0 ),
+            api_key_is_set     => ( $self->retrieve_data('api_key') ? 1 : 0 ),
             selected_itemtypes => \%selected,
             itemtypes          => Koha::ItemTypes->search_with_localization,
         );
 
-        $self->output_html( $template->output() );
+        return $self->output_html( $template->output() );
     }
-    else {
-        my $data = {
-            api_base_url => scalar $cgi->param('api_base_url'),
-            username     => scalar $cgi->param('username'),
-            itemtypes    => encode_json( [ $cgi->multi_param('itemtypes') ] ),
-        };
 
-        my $new_password = scalar $cgi->param('password');
-        if ( defined $new_password && length $new_password ) {
-            my $encrypted = try {
-                Koha::Encryption->new->encrypt_hex($new_password);
-            }
-            catch {
-                warn "Could not encrypt password. Die here.";
-                undef;
-            };
+    my $data = {
+        itemtypes => encode_json( [ $cgi->multi_param('itemtypes') ] ),
+    };
 
-            if ($encrypted) {
-                $data->{password} = $encrypted;
-            }
-            else {
-                my $template = $self->get_template( { file => 'configure.tt' } );
-                $template->param(
-                    error              => 'encryption_unavailable',
-                    api_base_url       => $data->{api_base_url},
-                    username           => $data->{username},
-                    password_is_set    => ( $self->retrieve_data('password') ? 1 : 0 ),
-                    selected_itemtypes => { map { $_ => 1 } $cgi->multi_param('itemtypes') },
-                    itemtypes          => Koha::ItemTypes->search_with_localization,
-                );
-                return $self->output_html( $template->output() );
-            }
-        }
-
-        $self->store_data($data);
-        $self->go_home();
+    # Only replace the stored key when a new one is entered.
+    my $new_key = scalar $cgi->param('api_key');
+    if ( defined $new_key && length $new_key ) {
+        $data->{api_key} = Koha::Encryption->new->encrypt_hex($new_key);
     }
+
+    $self->store_data($data);
+
+    return $self->go_home();
 }
 
 sub intranet_head {

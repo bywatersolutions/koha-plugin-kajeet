@@ -25,7 +25,7 @@
 <div class="main container-fluid">
     <div class="row">
         <div class="col-sm-10 col-sm-push-1">
-            <h1>Kajeet API Configuration</h1>
+            <h1>Kajeet to Koha: Configuration</h1>
 
             <form method="post">
                 [% INCLUDE 'csrf-token.inc' %]
@@ -33,34 +33,25 @@
                 <input type="hidden" name="method" value="[% METHOD %]"/>
 
                 <fieldset class="rows">
-                    <legend>API credentials</legend>
+                    <legend>Kajeet API</legend>
                     <ol>
                         <li>
-                            <label for="api_base_url">API base URL: </label>
-                            <input type="text" name="api_base_url" id="api_base_url"
-                                   value="[% api_base_url | html %]" size="60"
-                                   placeholder="https://sentinel-api.kajeet.com/sentinel/api" />
-                        </li>
-                        <li>
-                            <label for="username">Username: </label>
-                            <input type="text" name="username" id="username"
-                                   value="[% username | html %]" size="60"
-                                   autocomplete="off" />
-                        </li>
-                        <li>
-                            <label for="password">Password: </label>
-                            <input type="password" name="password" id="password"
+                            <label for="api_key">API key: </label>
+                            <input type="password" name="api_key" id="api_key"
                                    value="" size="60" autocomplete="new-password"
-                                   [% IF password_is_set %]placeholder="**************************"[% END %] />
+                                   [% IF api_key_is_set %]placeholder="(unchanged - enter a new key to replace)"[% END %] />
+                            [% IF api_key_is_set %]
+                                <div class="hint">A key is stored. Leave blank to keep it.</div>
+                            [% END %]
                         </li>
                     </ol>
                 </fieldset>
 
                 <fieldset class="rows">
-                    <legend>Item types</legend>
+                    <legend>Hotspot settings</legend>
                     <ol>
                         <li>
-                            <label for="itemtypes">Choose item types: </label>
+                            <label for="itemtypes">Hotspot item types: </label>
                             <select name="itemtypes" id="itemtypes" multiple size="8">
                                 [% FOREACH it IN itemtypes %]
                                     <option value="[% it.itemtype | html %]"

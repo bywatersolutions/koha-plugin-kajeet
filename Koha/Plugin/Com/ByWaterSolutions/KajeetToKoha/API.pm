@@ -1,47 +1,37 @@
 package Koha::Plugin::Com::ByWaterSolutions::KajeetToKoha;
 
+# Kajeet DataBridge API methods - same package, separate file
+
 use Modern::Perl;
 use JSON qw( encode_json decode_json );
 use LWP::UserAgent;
 use Koha::Encryption;
 
-sub authenticate {
+sub _api_key {
     my ($self) = @_;
+
+    my $stored = $self->retrieve_data('api_key');
+    return unless $stored;
+
+    return Koha::Encryption->new->decrypt_hex($stored);
+}
+
+sub _kajeet_request {
+    my ( $self, $body ) = @_;
 
     $self->{_kajeet_ua} //= LWP::UserAgent->new( timeout => 15 );
 
-    my $base_url = $self->retrieve_data('api_base_url')
-        || 'https://sentinel-api.kajeet.com/sentinel/api';
-
     my $res = $self->{_kajeet_ua}->post(
-        $base_url . '/v1.0/auth/token',
+        'https://databridge.kajeet.com/v2.0/media/actions',
         'Content-Type' => 'application/json',
-        Content        => encode_json({
-            username => $self->retrieve_data('username'),
-            password => $self->_api_password,
-        }),
+        'x-api-key'    => $self->_api_key,
+        Content        => encode_json($body),
     );
 
-    die "Kajeet authentication failed (" . $res->code . ")" unless $res->is_success;
+    die 'Kajeet API error (' . $res->code . '): ' . $res->decoded_content
+        unless $res->is_success;
 
-    my $data = decode_json( $res->decoded_content );
-    $self->{_kajeet_token}   = $data->{token} or die "no token in auth response";
-    $self->{_kajeet_corp_id} = $data->{details}->{corpId};
-
-    return;
-}
-
-sub _token {
-    my ($self) = @_;
-    $self->authenticate unless $self->{_kajeet_token};
-    return $self->{_kajeet_token};
-}
-
-sub _api_password {
-    my ($self) = @_;
-    my $stored = $self->retrieve_data('password');
-    return unless $stored;
-    return Koha::Encryption->new->decrypt_hex($stored);
+    return length( $res->decoded_content // '' ) ? decode_json( $res->decoded_content ) : undef;
 }
 
 1;
