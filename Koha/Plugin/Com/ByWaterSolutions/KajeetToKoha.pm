@@ -1,8 +1,23 @@
 package Koha::Plugin::Com::ByWaterSolutions::KajeetToKoha;
 
+# Koha is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# Koha is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Koha; if not, see <https://www.gnu.org/licenses>.
+
+
 use Modern::Perl;
 
 use Koha::Plugin::Com::ByWaterSolutions::KajeetToKoha::API;
+use Koha::Plugin::Com::ByWaterSolutions::KajeetToKoha::BackgroundJob;
 
 use base qw(Koha::Plugins::Base);
 
@@ -23,6 +38,7 @@ our $metadata = {
     minimum_version  => '25.1100000',
     maximum_version  => '28.1199000',
     version          => $VERSION,
+    namespace        => 'kajeet',
 };
 
 sub new {
@@ -110,6 +126,18 @@ sub api_namespace {
     return 'bywatersolutions_kajeettokoha';
 }
 
+=head3 background_tasks
+     
+Plugin hook used to register new background_job types
+    
+=cut
+
+sub background_tasks {
+    return {
+        device_action => 'Koha::Plugin::Com::ByWaterSolutions::KajeetToKoha::BackgroundJob',
+    };
+}
+
 sub after_circ_action {
     my ( $self, $params ) = @_;
 
@@ -126,11 +154,11 @@ sub after_circ_action {
         return unless $item_field;
 
         try {
-            $self->_kajeet_request({
-                actionType => 'checkout',
-                imei       => $checkout_item->$item_field,
-                borrowerId => $checkout->borrowernumber,
-                dueDate    => $due,
+            Koha::Plugin::Com::ByWaterSolutions::KajeetToKoha::BackgroundJob->new->enqueue({
+                action_type => 'checkout',
+                imei        => $checkout_item->$item_field,
+                borrower_id => $checkout->borrowernumber,
+                due_date    => $due,
             });
         }
         catch {
@@ -148,9 +176,9 @@ sub after_circ_action {
         my $item_field = $self->retrieve_data('item_field_for_imei');
         return unless $item_field;
         try {
-            $self->_kajeet_request({
-                actionType => 'checkin',
-                imei       => $checkin_item->$item_field,
+            Koha::Plugin::Com::ByWaterSolutions::KajeetToKoha::BackgroundJob->new->enqueue({
+                action_type => 'checkin',
+                imei        => $checkin_item->$item_field,
             });
         }
         catch {
