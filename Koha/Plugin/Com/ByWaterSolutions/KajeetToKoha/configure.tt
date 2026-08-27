@@ -39,7 +39,7 @@
                             <label for="api_key">API key: </label>
                             <input type="password" name="api_key" id="api_key"
                                    value="" size="60" autocomplete="new-password"
-                                   [% IF api_key_is_set %]placeholder="A KEY IS CURRENTLY STORED"[% END %] />
+                                   [% IF api_key_is_set %]placeholder="******************************"[% END %] />
                             [% IF api_key_is_set %]
                                 <div class="hint">An API key is currently stored</div>
                             [% END %]
