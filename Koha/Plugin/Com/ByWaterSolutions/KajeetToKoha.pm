@@ -27,7 +27,7 @@ use Try::Tiny;
 use Koha::Encryption;
 use Koha::ItemTypes;
 
-our $VERSION = "0.0.1";
+our $VERSION = "1.0.1";
 
 our $metadata = {
     name             => 'Kajeet API plugin',
